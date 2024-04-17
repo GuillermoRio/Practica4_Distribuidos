@@ -1,48 +1,234 @@
-<!DOCTYPE html>
+<!doctype html>
 <html>
   <head>
-    <meta name="viewport" content="width=device-width,initial-scale=1.0">
+    <meta name="viewport" content="width=device-width,initial-scale=1.0" />
     <title>Socket.IO chat</title>
     <style>
-      body { margin: 0; padding-bottom: 3rem; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+      body {
+        margin: 0;
+        padding-bottom: 3rem;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+          Helvetica, Arial, sans-serif;
+      }
 
-      #form { background: rgba(0, 0, 0, 0.15); padding: 0.25rem; position: fixed; bottom: 0; left: 0; right: 0; display: flex; height: 3rem; box-sizing: border-box; backdrop-filter: blur(10px); }
-      #input { border: none; padding: 0 1rem; flex-grow: 1; border-radius: 2rem; margin: 0.25rem; }
-      #input:focus { outline: none; }
-      #form > button { background: #333; border: none; padding: 0 1rem; margin: 0.25rem; border-radius: 3px; outline: none; color: #fff; }
+      #chatPanel {
+        background: #333;
+        color: #fff;
+        padding: 0.5rem;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
 
-      #messages { list-style-type: none; margin: 0; padding: 0; }
-      #messages > li { padding: 0.5rem 1rem; }
-      #messages > li:nth-child(odd) { background: #efefef; }
+      #chatTitle {
+        margin: 0;
+        font-size: 1.5rem;
+      }
+
+      #closeChatButton {
+        background-color: red;
+        border: none;
+        color: white;
+        padding: 0.5rem;
+        border-radius: 5px;
+        cursor: pointer;
+      }
+
+      #userCount {
+        margin-right: 1rem;
+        font-size: 1rem;
+      }
+
+      #form {
+        background: rgba(0, 0, 0, 0.15);
+        padding: 0.25rem;
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        display: flex;
+        height: 3rem;
+        box-sizing: border-box;
+        backdrop-filter: blur(10px);
+      }
+
+      #input {
+        border: none;
+        padding: 0 1rem;
+        flex-grow: 1;
+        border-radius: 2rem;
+        margin: 0.25rem;
+      }
+
+      #input:focus {
+        outline: none;
+      }
+
+      #form > button {
+        border: none;
+        padding: 0 1rem;
+        margin: 0.25rem;
+        border-radius: 3px;
+        outline: none;
+        color: #fff;
+        cursor: pointer;
+      }
+
+      #messages {
+        list-style-type: none;
+        margin: 0;
+        padding: 0;
+      }
+
+      #messages > li {
+        padding: 0.5rem 1rem;
+        position: relative; /* Posición relativa para que el tiempo sea absoluto en relación con esto */
+      }
+
+      #messages > li:nth-child(odd) {
+        background: #efefef;
+      }
+
+      .buttonOn {
+        background-color: green;
+      }
+
+      .buttonSend {
+        background-color: black;
+      }
+
+      .buttonOff {
+        background-color: red;
+      }
+
+      .time {
+        position: absolute;
+        right: 10px;
+        bottom: 5px;
+        color: black; /* Color del tiempo */
+        font-size: 0.8rem; /* Tamaño de fuente del tiempo */
+      }
     </style>
   </head>
   <body>
+    <div id="chatPanel">
+      <h1 id="chatTitle">CHAT DISTRIBUIDO</h1>
+      <div>
+        <span id="userCount">Usuarios conectados: 0</span>
+        <button id="closeChatButton" class="blackText">Cerrar Chat</button>
+      </div>
+    </div>
     <ul id="messages"></ul>
     <form id="form" action="">
-      <input id="input" autocomplete="off" /><button>Send</button>
+      <input id="input" autocomplete="off" /><button class="buttonSend">
+        Send
+      </button>
+      <button id="toggleButton" class="buttonOn blackText">ON</button>
     </form>
     <script src="/socket.io/socket.io.js"></script>
 
     <script>
       const socket = io();
+      const messages = document.getElementById("messages");
+      const form = document.getElementById("form");
+      const input = document.getElementById("input");
+      const sendButton = form.querySelector("button");
+      const toggleButton = document.getElementById("toggleButton");
+      const closeChatButton = document.getElementById("closeChatButton");
+      let userName;
 
-      const messages = document.getElementById('messages');
-      const form = document.getElementById('form');
-      const input = document.getElementById('input');
+      // Función para solicitar el nombre de usuario
+      function requestUserName() {
+        userName = prompt("Por favor, introduce tu nombre para el chat:");
+        if (!userName) {
+          // Si no se proporciona un nombre, se usa uno predeterminado
+          userName = "Usuario Anónimo";
+        }
+      }
 
-      form.addEventListener('submit', (e) => {
+      // Solicitar el nombre de usuario al cargar la página por primera vez
+      document.addEventListener("DOMContentLoaded", () => {
+        requestUserName();
+      });
+
+      toggleButton.addEventListener("click", () => {
+        const open = toggleButton.classList.contains("buttonOn");
+        socket.emit("toggleCommunication", { open: !open, user: userName }); // Envía el nombre de usuario al servidor
+      });
+
+      form.addEventListener("submit", (e) => {
         e.preventDefault();
         if (input.value) {
-          socket.emit('chat message', input.value);
-          input.value = '';
+          socket.emit("chat message", { user: userName, message: input.value });
+          input.value = "";
         }
       });
 
-      socket.on('chat message', (msg) => {
-        const item = document.createElement('li');
-        item.textContent = msg;
+      sendButton.addEventListener("click", () => {
+        if (input.value.trim() !== "") {
+          socket.emit("chat message", { user: userName, message: input.value });
+          input.value = "";
+        }
+      });
+
+      socket.on("chat message", ({ user, message, time }) => {
+        const item = document.createElement("li");
+        item.textContent = `${user}: ${message}`;
+
+        const messageTime = new Date(time);
+        const formattedTime = `${("0" + messageTime.getHours()).slice(-2)}:${("0" + messageTime.getMinutes()).slice(-2)}`;
+
+        const timeElement = document.createElement("span");
+        timeElement.textContent = formattedTime;
+        timeElement.className = "time";
+        item.appendChild(timeElement);
+
         messages.appendChild(item);
         window.scrollTo(0, document.body.scrollHeight);
+      });
+
+
+      socket.on("toggleCommunication", ({ open, message, time }) => {
+        const item = document.createElement("li");
+        item.textContent = message;
+
+        const messageTime = new Date(time);
+        const formattedTime = `${messageTime.getHours()}:${(messageTime.getMinutes() < 10 ? "0" : "") + messageTime.getMinutes()}`;
+
+        const timeElement = document.createElement("span");
+        timeElement.textContent = formattedTime;
+        timeElement.className = "time";
+
+        item.appendChild(timeElement);
+        messages.appendChild(item);
+        window.scrollTo(0, document.body.scrollHeight);
+
+        if (open) {
+          // Comunicación abierta
+          toggleButton.textContent = "ON";
+          toggleButton.classList.remove("buttonOff");
+          toggleButton.classList.add("buttonOn");
+          input.disabled = false;
+          sendButton.disabled = false;
+        } else {
+          // Comunicación cerrada
+          toggleButton.textContent = "OFF";
+          toggleButton.classList.remove("buttonOn");
+          toggleButton.classList.add("buttonOff");
+          input.disabled = true;
+          sendButton.disabled = true;
+        }
+      });
+
+      closeChatButton.addEventListener("click", () => {
+        if (confirm("¿Estás seguro de que quieres cerrar el chat?")) {
+          socket.emit("closeChat"); // Envía una señal para cerrar el chat
+        }
+      });
+
+      socket.on("userCount", (count) => {
+        const userCountElement = document.getElementById("userCount");
+        userCountElement.textContent = `Usuarios conectados: ${count}`;
       });
     </script>
   </body>
